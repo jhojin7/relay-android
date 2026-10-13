@@ -1,0 +1,29 @@
+plugins { id 'com.android.application' }
+def signingValues = new Properties()
+def signingFile = rootProject.file('signing/signing.properties')
+if (signingFile.exists()) signingFile.withInputStream { signingValues.load(it) }
+android {
+    namespace 'com.hush.voice'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'com.hush.voice'
+        minSdk 31
+        targetSdk 35
+        versionCode 2
+        versionName '1.1.0'
+        testInstrumentationRunner 'com.hush.voice.HushTestRunner'
+    }
+    signingConfigs {
+        if (signingFile.exists()) {
+            localRelease {
+                storeFile rootProject.file(signingValues.storeFile)
+                storePassword signingValues.storePassword
+                keyAlias signingValues.keyAlias
+                keyPassword signingValues.keyPassword
+            }
+        }
+    }
+    buildTypes { release { minifyEnabled false; if (signingFile.exists()) signingConfig signingConfigs.localRelease } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    lint { abortOnError true }
+}
