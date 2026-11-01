@@ -12,7 +12,7 @@ Date: 2026-10-13.
 
 ## Remaining device checks
 
-The user confirmed the original assistant/power shortcut works on their Galaxy S23. The new Groq transcription, native PCM microphone quality/VAD, and updated UI still need use on that phone. The Android on-device recognizer in the emulator has no usable speech-language model, so its transcription accuracy is not evaluated here. Runtime cloud tests simulate provider responses and do not certify remote speech accuracy. Background request completion is best effort; interrupted audio is retained for manual retry.
+The user confirmed the original assistant/power shortcut works on their personal Android phone. The new Groq transcription, native PCM microphone quality/VAD, and updated UI still need use on that phone. The Android on-device recognizer in the emulator has no usable speech-language model, so its transcription accuracy is not evaluated here. Runtime cloud tests simulate provider responses and do not certify remote speech accuracy. Background request completion is best effort; interrupted audio is retained for manual retry.
 
 ## Delivered APK SHA-256
 

@@ -42,7 +42,7 @@ requires a configured provider/key, microphone input and network access.
 `control.py doctor` reads the emulator serial, exact AVD name, emulator property and
 boot completion. Every helper command repeats this guard. Only serial
 `emulator-5580` running `relay-evaluation-disposable` is allowed. Never run tests on
-the S23 or any physical phone: the runner resets history and preferences.
+any physical phone: the runner resets history and preferences.
 If anything fails unexpectedly, run doctor, force-stop only this emulator's Relay
 process, relaunch and inspect `ui` before another drive. Use one coordinator for UI;
 never double-drive this shared emulator.
