@@ -35,6 +35,8 @@ final class CloudDictationEngine implements DictationController {
   private volatile AudioSource source;
   private boolean recording, uploading, closed;
   private String endpoint, model, language;
+  private String provider;
+  private boolean retain;
   private long begun;
 
   CloudDictationEngine(Context c, DictationEngine.Listener l) {
@@ -114,6 +116,8 @@ final class CloudDictationEngine implements DictationController {
     endpoint = Prefs.endpoint(context);
     model = Prefs.model(context);
     language = Prefs.language(context);
+    provider = Prefs.provider(context);
+    retain = Prefs.keepRecordings(context);
     try {
       CloudClient.endpoint(endpoint);
       CloudClient.validateModel(model);
@@ -143,7 +147,8 @@ final class CloudDictationEngine implements DictationController {
     boolean haveAudio = false;
     try (NoteStore store = new NoteStore(context)) {
       store.addPending(
-          new NoteStore.Pending(id, created, filename, endpoint, model, language, 0, "recording"));
+          new NoteStore.Pending(
+              id, created, filename, endpoint, model, language, 0, "recording", retain, provider));
       try (WavFile wav = new WavFile(audio)) {
         if (!stopRequested) {
           source = factory.create();
@@ -203,7 +208,7 @@ final class CloudDictationEngine implements DictationController {
             e instanceof IOException
                 ? e.getMessage()
                 : "Couldn't record from the microphone. Check permissions and Android's microphone"
-                      + " privacy setting.";
+                    + " privacy setting.";
         haveAudio = audio.length() > 3244;
       } finally {
         AudioSource current = source;
@@ -251,7 +256,8 @@ final class CloudDictationEngine implements DictationController {
             CloudJobs.submit(
                 context,
                 new NoteStore.Pending(
-                    id, created, filename, endpoint, model, language, duration, "ready"),
+                    id, created, filename, endpoint, model, language, duration, "ready", retain,
+                    provider),
                 client,
                 new CloudJobs.Result() {
                   public void complete(String text, long noteId) {

@@ -16,6 +16,7 @@ final class CloudJobs {
 
   static final ExecutorService workers = Executors.newFixedThreadPool(2);
   private static final Set<String> active = ConcurrentHashMap.newKeySet();
+  private static final Object storageLock = new Object();
 
   static void changed(Context c) {
     c.sendBroadcast(
@@ -57,8 +58,10 @@ final class CloudJobs {
                 throw new IOException(
                     "No API key for this endpoint. Configure it in Settings, then retry.");
               text = client.transcribe(audio, p.endpoint, p.model, key, p.language);
-              noteId = store.completePending(p, text);
-              if (noteId > 0) audio.delete();
+              synchronized (storageLock) {
+                noteId = store.completePending(p, text);
+                if (noteId > 0 && !p.retain) audio.delete();
+              }
             } catch (Exception e) {
               store.pendingState(p.id, "failed", p.seconds);
               error =
@@ -87,10 +90,17 @@ final class CloudJobs {
   }
 
   static void recover(Context c) {
+    synchronized (storageLock) {
+      recoverLocked(c);
+    }
+  }
+
+  private static void recoverLocked(Context c) {
     if (RecordingOwnership.capturing()) return;
     Set<String> keep = new HashSet<>();
     File directory = directory(c);
     try (NoteStore store = new NoteStore(c)) {
+      keep.addAll(store.evaluationFiles());
       for (NoteStore.Pending p : store.pending()) {
         keep.add(p.file);
         if (busy(p.id)) continue;

@@ -33,12 +33,40 @@ The language option **Auto** omits the language hint for cloud providers. Androi
 - Transcripts and recovery drafts are in app-private SQLite. Cloud and device-transfer backups are disabled. No analytics or ads.
 - API keys are encrypted with an Android Keystore AES-GCM key and authenticated to their exact endpoint URL. No plaintext keys are stored, shown in logs, or sent to another endpoint after a configuration change.
 - Cloud recording uses 16 kHz mono PCM WAV. Audio is uploaded **after capture stops**. HTTPS redirects are refused rather than forwarding credentials. API use follows the provider account's limits and billing.
-- Audio is deleted after the returned transcript is committed locally. Failed/interrupted recordings remain in **Pending recordings** for retry or deletion.
+- By default, audio is deleted after the returned transcript is committed locally. Failed/interrupted recordings remain in **Pending recordings** for retry or deletion.
 - Retry explicitly uses the current cloud provider/model settings, so a mistaken model or endpoint can be corrected without rerecording.
 - Dismissing a recorder stops microphone capture. A cloud request may finish after its UI closes. If Android kills the process, recoverable audio appears for manual retry on the next launch.
 - Explicit Discard deletes in-progress cloud audio and prevents upload. Once uploading begins, Discard is disabled; Close may dismiss the UI while the request finishes.
 - Uninstalling deletes transcripts, pending audio, and keys. Export transcripts first if you need to keep them.
 - Relay does not request screen contents, screenshots, accessibility access, or automatic typing access. Copy/paste sends text to other apps.
+
+## Collecting your own evaluation data
+
+In **Settings → Evaluation data**, turn on **Keep recordings for evaluation** before
+starting a Groq or Custom API recording. It is off by default. Relay keeps the
+captured 16 kHz mono PCM WAV and the original transcription in private app storage,
+alongside the note's latest edited text, capture time, language, duration and
+provider/model. Editing a note does not change its saved original transcription.
+Android on-device/system speech does not provide audio to this collection path.
+
+**Export evaluation ZIP** opens Android's file picker. The ZIP contains:
+
+- `manifest.json`: schema version, recording count and audio format.
+- `recordings.jsonl`: one record per retained note, with `note_id`, `created_at_ms`,
+  `audio`, `original_transcript`, `transcript` (latest text), `language`,
+  `duration_seconds`, `provider` and `model`.
+- `audio/<note_id>.wav`: the matching captured audio.
+
+No API keys, endpoint URLs or raw provider responses are included. The latest text
+is only a correction/reference if you have reviewed it; untouched model output is
+not ground truth. TXT export continues to export current transcripts only.
+
+The retention choice is fixed when capture starts and survives failure/retry.
+Turning it off affects future recordings and does not erase existing pairs.
+It does not recover old deleted audio or retroactively collect old pending items.
+Delete a transcript to delete its retained audio and original text too. Exporting
+does not remove local data; deleting a note does not remove exported ZIP copies.
+Uninstalling still removes all local data, and Android backups remain disabled.
 
 ## Updates from Hush
 
@@ -64,6 +92,11 @@ GitHub Actions builds/lints the debug application and compiles its runtime tests
 ## Runtime verification
 
 See [VERIFICATION.md](VERIFICATION.md) and [TEST-RESULTS.txt](TEST-RESULTS.txt). **Runtime tests reset history and preferences: run only on a disposable emulator, never on the user's S23.**
+
+Evaluation retention checks and synthetic UI screenshots are in
+[evaluation-data.md](docs/verification/evaluation-data.md). The project-local
+[verify-relay skill](.agents/skills/verify-relay/SKILL.md) provides the guarded
+emulator harness and feature map.
 
 ```sh
 adb install -r app/build/outputs/apk/debug/app-debug.apk

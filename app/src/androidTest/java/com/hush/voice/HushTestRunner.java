@@ -6,9 +6,12 @@ import java.lang.reflect.*;
 
 /** Tiny Android-runtime test runner, avoiding an unnecessary test framework dependency. */
 public final class HushTestRunner extends Instrumentation {
+  private String selectedClass;
+
   @Override
   public void onCreate(Bundle arguments) {
     super.onCreate(arguments);
+    selectedClass = arguments == null ? null : arguments.getString("class");
     start();
   }
 
@@ -16,9 +19,13 @@ public final class HushTestRunner extends Instrumentation {
   public void onStart() {
     int passed = 0, failed = 0;
     StringBuilder report = new StringBuilder();
-    for (Class<?> type : new Class<?>[] {HushTests.class, CloudTests.class})
+    for (Class<?> type :
+        new Class<?>[] {HushTests.class, CloudTests.class, EvaluationUiTests.class})
       for (Method method : type.getDeclaredMethods()) {
         if (!method.getName().startsWith("test")) continue;
+        if (selectedClass != null
+            && !selectedClass.equals(type.getName())
+            && !selectedClass.equals(type.getName() + "#" + method.getName())) continue;
         Object test;
         try {
           java.lang.reflect.Constructor<?> ctor =
@@ -51,6 +58,10 @@ public final class HushTestRunner extends Instrumentation {
           }
         }
       }
+    if (passed == 0 && failed == 0) {
+      failed++;
+      report.append("FAIL no matching tests\n");
+    }
     Bundle results = new Bundle();
     results.putString("stream", "\n" + report + "\n" + passed + " passed, " + failed + " failed\n");
     results.putInt("passed", passed);
