@@ -52,6 +52,10 @@ final class Prefs {
     return get(c).getBoolean("copy", false);
   }
 
+  static boolean keepRecordings(Context c) {
+    return get(c).getBoolean("keep_recordings", false);
+  }
+
   static void copy(Context c, String text) {
     ((ClipboardManager) c.getSystemService(Context.CLIPBOARD_SERVICE))
         .setPrimaryClip(ClipData.newPlainText("Relay transcript", text));

@@ -7,6 +7,8 @@ import java.util.*;
 
 /** App-private transcripts; a single durable draft protects against process loss. */
 public final class NoteStore extends SQLiteOpenHelper {
+  private final Context context;
+
   public static final class Note {
     public final long id, created;
     public final String text, language;
@@ -22,7 +24,8 @@ public final class NoteStore extends SQLiteOpenHelper {
   }
 
   public NoteStore(Context c) {
-    super(c.getApplicationContext(), "hush.db", null, 2);
+    super(c.getApplicationContext(), "hush.db", null, 3);
+    context = c.getApplicationContext();
   }
 
   @Override
@@ -34,26 +37,57 @@ public final class NoteStore extends SQLiteOpenHelper {
         "CREATE TABLE draft (id INTEGER PRIMARY KEY CHECK(id=1), text TEXT NOT NULL, language TEXT"
             + " NOT NULL, seconds INTEGER NOT NULL)");
     createPending(db);
+    createEvaluation(db);
   }
 
   private static void createPending(SQLiteDatabase db) {
     db.execSQL(
         "CREATE TABLE IF NOT EXISTS pending (id TEXT PRIMARY KEY, created INTEGER NOT NULL, file"
             + " TEXT NOT NULL, endpoint TEXT NOT NULL, model TEXT NOT NULL, language TEXT NOT NULL,"
-            + " seconds INTEGER NOT NULL, state TEXT NOT NULL)");
+            + " seconds INTEGER NOT NULL, state TEXT NOT NULL, retain INTEGER NOT NULL DEFAULT 0,"
+            + " provider TEXT NOT NULL DEFAULT '')");
+  }
+
+  private static void createEvaluation(SQLiteDatabase db) {
+    db.execSQL(
+        "CREATE TABLE evaluation (note_id INTEGER PRIMARY KEY, file TEXT NOT NULL,"
+            + " original_text TEXT NOT NULL, provider TEXT NOT NULL, model TEXT NOT NULL)");
   }
 
   @Override
   public void onUpgrade(SQLiteDatabase db, int from, int to) {
     if (from < 2) createPending(db);
+    if (from < 3) {
+      if (from >= 2) {
+        db.execSQL("ALTER TABLE pending ADD COLUMN retain INTEGER NOT NULL DEFAULT 0");
+        db.execSQL("ALTER TABLE pending ADD COLUMN provider TEXT NOT NULL DEFAULT ''");
+      }
+      createEvaluation(db);
+    }
   }
 
   static final class Pending {
     final String id, file, endpoint, model, language, state;
     final int seconds;
     final long created;
+    final boolean retain;
+    final String provider;
 
     Pending(String i, long c, String f, String e, String m, String l, int s, String st) {
+      this(i, c, f, e, m, l, s, st, false, "");
+    }
+
+    Pending(
+        String i,
+        long c,
+        String f,
+        String e,
+        String m,
+        String l,
+        int s,
+        String st,
+        boolean keep,
+        String source) {
       id = i;
       created = c;
       file = f;
@@ -62,6 +96,8 @@ public final class NoteStore extends SQLiteOpenHelper {
       language = l;
       seconds = s;
       state = st;
+      retain = keep;
+      provider = source;
     }
   }
 
@@ -75,6 +111,8 @@ public final class NoteStore extends SQLiteOpenHelper {
     v.put("language", p.language);
     v.put("seconds", p.seconds);
     v.put("state", p.state);
+    v.put("retain", p.retain ? 1 : 0);
+    v.put("provider", p.provider);
     getWritableDatabase().insertOrThrow("pending", null, v);
   }
 
@@ -83,8 +121,8 @@ public final class NoteStore extends SQLiteOpenHelper {
     try (Cursor c =
         getReadableDatabase()
             .rawQuery(
-                "SELECT id,created,file,endpoint,model,language,seconds,state FROM pending ORDER BY"
-                    + " created DESC",
+                "SELECT id,created,file,endpoint,model,language,seconds,state,retain,provider FROM"
+                    + " pending ORDER BY created DESC",
                 null)) {
       while (c.moveToNext())
         out.add(
@@ -96,7 +134,9 @@ public final class NoteStore extends SQLiteOpenHelper {
                 c.getString(4),
                 c.getString(5),
                 c.getInt(6),
-                c.getString(7)));
+                c.getString(7),
+                c.getInt(8) != 0,
+                c.getString(9)));
     }
     return out;
   }
@@ -108,11 +148,13 @@ public final class NoteStore extends SQLiteOpenHelper {
     getWritableDatabase().update("pending", v, "id=?", new String[] {id});
   }
 
-  void configurePending(String id, String endpoint, String model, String language) {
+  void configurePending(
+      String id, String endpoint, String model, String language, String provider) {
     ContentValues v = new ContentValues();
     v.put("endpoint", endpoint);
     v.put("model", model);
     v.put("language", language);
+    v.put("provider", provider);
     getWritableDatabase().update("pending", v, "id=?", new String[] {id});
   }
 
@@ -133,6 +175,15 @@ public final class NoteStore extends SQLiteOpenHelper {
       v.put("language", p.language);
       v.put("seconds", p.seconds);
       long id = db.insertOrThrow("notes", null, v);
+      if (p.retain) {
+        ContentValues evaluation = new ContentValues();
+        evaluation.put("note_id", id);
+        evaluation.put("file", p.file);
+        evaluation.put("original_text", text);
+        evaluation.put("provider", p.provider);
+        evaluation.put("model", p.model);
+        db.insertOrThrow("evaluation", null, evaluation);
+      }
       db.delete("pending", "id=?", new String[] {p.id});
       db.setTransactionSuccessful();
       return id;
@@ -208,6 +259,35 @@ public final class NoteStore extends SQLiteOpenHelper {
   }
 
   public void delete(long id) {
-    getWritableDatabase().delete("notes", "id=?", new String[] {"" + id});
+    SQLiteDatabase db = getWritableDatabase();
+    String file = null;
+    db.beginTransaction();
+    try {
+      try (Cursor c =
+          db.rawQuery("SELECT file FROM evaluation WHERE note_id=?", new String[] {"" + id})) {
+        if (c.moveToFirst()) file = c.getString(0);
+      }
+      db.delete("evaluation", "note_id=?", new String[] {"" + id});
+      db.delete("notes", "id=?", new String[] {"" + id});
+      db.setTransactionSuccessful();
+    } finally {
+      db.endTransaction();
+    }
+    if (file != null) new java.io.File(CloudJobs.directory(context), file).delete();
+  }
+
+  Set<String> evaluationFiles() {
+    Set<String> files = new HashSet<>();
+    try (Cursor c = getReadableDatabase().rawQuery("SELECT file FROM evaluation", null)) {
+      while (c.moveToNext()) files.add(c.getString(0));
+    }
+    return files;
+  }
+
+  int evaluationCount() {
+    try (Cursor c = getReadableDatabase().rawQuery("SELECT count(*) FROM evaluation", null)) {
+      c.moveToFirst();
+      return c.getInt(0);
+    }
   }
 }

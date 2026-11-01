@@ -48,6 +48,8 @@ public final class MainActivity extends Activity {
   private RecordingPanel recordingPanel;
   private String search = "", exportText = "";
   private boolean wantsDictation, pendingAutoSave;
+  private static final java.util.concurrent.ExecutorService exports =
+      java.util.concurrent.Executors.newSingleThreadExecutor();
 
   @Override
   public void onCreate(Bundle state) {
@@ -429,7 +431,7 @@ public final class MainActivity extends Activity {
             this,
             Prefs.cloud(this)
                 ? "Audio is uploaded to the selected provider after recording. Transcripts stay in"
-                      + " local history."
+                    + " local history."
                 : Prefs.offline(this)
                     ? "Uses Android's on-device speech engine."
                     : "Uses the Android speech service; it may process audio online.",
@@ -492,14 +494,41 @@ public final class MainActivity extends Activity {
         Ui.button(this, "Open Android assistant settings", false, this::chooseAssistant));
     body.addView(assistant);
     Ui.gap(body, 20);
+    LinearLayout evaluation = card();
+    evaluation.addView(Ui.bold(this, "Evaluation data", 17, Ui.WHITE));
+    Switch keep = new Switch(this);
+    keep.setText("Keep recordings for evaluation");
+    keep.setTextSize(15);
+    keep.setTextColor(Ui.WHITE);
+    keep.setMinHeight(Ui.dp(this, 48));
+    keep.setChecked(Prefs.keepRecordings(this));
+    keep.setOnCheckedChangeListener(
+        (b, v) -> Prefs.get(this).edit().putBoolean("keep_recordings", v).apply());
+    evaluation.addView(keep);
+    evaluation.addView(
+        Ui.text(
+            this,
+            "Applies to cloud recordings started while enabled. Keeps original audio and"
+                + " transcription with your latest edits, provider and model on this device."
+                + " Android speech recordings are not collected. Turning this off keeps previously"
+                + " saved data. Delete a transcript to delete its saved audio too. Export before"
+                + " uninstalling.",
+            13,
+            Ui.MUTED));
+    Ui.gap(evaluation, 10);
+    evaluation.addView(Ui.text(this, "Saved recordings: " + store.evaluationCount(), 14, Ui.MUTED));
+    evaluation.addView(Ui.button(this, "Export evaluation ZIP", false, this::exportEvaluation));
+    body.addView(evaluation);
+    Ui.gap(body, 20);
     LinearLayout storage = card();
     storage.addView(Ui.bold(this, "Storage", 17, Ui.WHITE));
     Ui.gap(storage, 8);
     storage.addView(
         Ui.text(
             this,
-            "Transcripts are stored in private app storage. Cloud audio is deleted after successful"
-                + " transcription; failed recordings remain available for retry or deletion. API"
+            "Transcripts are stored in private app storage. Unless evaluation retention is enabled,"
+                + " cloud audio is deleted after successful transcription. Failed recordings remain"
+                + " available for retry or deletion. API"
                 + " keys are encrypted with Android Keystore.\n\n"
                 + "Export before uninstalling to keep your transcripts.",
             13,
@@ -619,8 +648,10 @@ public final class MainActivity extends Activity {
             Prefs.model(this),
             Prefs.language(this),
             old.seconds,
-            "ready");
-    store.configurePending(p.id, p.endpoint, p.model, p.language);
+            "ready",
+            old.retain,
+            Prefs.provider(this));
+    store.configurePending(p.id, p.endpoint, p.model, p.language, p.provider);
     java.lang.ref.WeakReference<MainActivity> target = new java.lang.ref.WeakReference<>(this);
     CloudJobs.submit(
         this,
@@ -881,7 +912,9 @@ public final class MainActivity extends Activity {
                 (d, w) ->
                     new AlertDialog.Builder(this)
                         .setTitle("Delete this note?")
-                        .setMessage("This permanently deletes the local transcript.")
+                        .setMessage(
+                            "This permanently deletes the local transcript and any saved evaluation"
+                                + " audio and original transcription.")
                         .setNegativeButton("Keep", null)
                         .setPositiveButton(
                             "Delete",
@@ -949,10 +982,55 @@ public final class MainActivity extends Activity {
         33);
   }
 
+  private void exportEvaluation() {
+    if (store.evaluationCount() == 0) {
+      Toast.makeText(
+              this,
+              "No evaluation recordings yet. Enable retention and record with a cloud provider.",
+              Toast.LENGTH_LONG)
+          .show();
+      return;
+    }
+    startActivityForResult(
+        new Intent(Intent.ACTION_CREATE_DOCUMENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType("application/zip")
+            .putExtra(
+                Intent.EXTRA_TITLE,
+                "Relay-evaluation-"
+                    + new SimpleDateFormat("yyyyMMdd-HHmm", Locale.ROOT).format(new Date())
+                    + ".zip"),
+        34);
+  }
+
   @Override
   protected void onActivityResult(int request, int result, Intent data) {
     super.onActivityResult(request, result, data);
-    if (request == 33 && result == RESULT_OK && data != null && data.getData() != null) {
+    if (request == 34 && result == RESULT_OK && data != null && data.getData() != null) {
+      android.net.Uri uri = data.getData();
+      Context app = getApplicationContext();
+      Toast.makeText(this, "Exporting evaluation data…", Toast.LENGTH_SHORT).show();
+      exports.execute(
+          () -> {
+            String message;
+            try (OutputStream out = app.getContentResolver().openOutputStream(uri, "wt")) {
+              if (out == null) throw new IOException();
+              int count = EvaluationArchive.write(app, out);
+              message = "Exported " + count + (count == 1 ? " recording" : " recordings");
+            } catch (Exception e) {
+              try {
+                android.provider.DocumentsContract.deleteDocument(app.getContentResolver(), uri);
+              } catch (Exception ignored) {
+                // Some document providers cannot remove a partial export. Local originals stay
+                // intact.
+              }
+              message = "Couldn't export. Local recordings are kept; try another folder.";
+            }
+            String status = message;
+            new Handler(Looper.getMainLooper())
+                .post(() -> Toast.makeText(app, status, Toast.LENGTH_LONG).show());
+          });
+    } else if (request == 33 && result == RESULT_OK && data != null && data.getData() != null) {
       try (OutputStream out = getContentResolver().openOutputStream(data.getData())) {
         if (out == null) throw new IOException();
         out.write(exportText.getBytes(StandardCharsets.UTF_8));

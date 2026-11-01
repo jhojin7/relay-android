@@ -62,7 +62,7 @@ public final class CloudTests {
     boolean disconnected;
     int wait;
 
-    Http(int status, String body) throws Exception {
+    Http(int status, String body) throws MalformedURLException {
       super(new URL(Prefs.GROQ_URL));
       this.status = status;
       this.body = body;
@@ -314,6 +314,224 @@ public final class CloudTests {
       assertEquals("Existing Hush transcript", s.list("").get(0).text);
       assertEquals(7L, s.list("").get(0).id);
       assertTrue(s.pending().isEmpty());
+    }
+  }
+
+  public void testVersionTwoUpgradePreservesPendingDraftAndHistory() throws Exception {
+    File audio = wave("v2.wav");
+    SQLiteDatabase db =
+        SQLiteDatabase.openOrCreateDatabase(context.getDatabasePath("hush.db"), null);
+    db.execSQL(
+        "CREATE TABLE notes (id INTEGER PRIMARY KEY, created INTEGER, text TEXT, language TEXT,"
+            + " seconds INTEGER)");
+    db.execSQL(
+        "CREATE TABLE draft (id INTEGER PRIMARY KEY, text TEXT, language TEXT, seconds INTEGER)");
+    db.execSQL(
+        "CREATE TABLE pending (id TEXT PRIMARY KEY, created INTEGER, file TEXT, endpoint TEXT,"
+            + " model TEXT, language TEXT, seconds INTEGER, state TEXT)");
+    db.execSQL("INSERT INTO notes VALUES(9,1000,'Relay transcript','ko-KR',5)");
+    db.execSQL("INSERT INTO draft VALUES(1,'Interrupted draft','ko-KR',3)");
+    db.execSQL(
+        "INSERT INTO pending VALUES('legacy',1000,'v2.wav',?,'model','ko-KR',1,'failed')",
+        new Object[] {Prefs.GROQ_URL});
+    db.setVersion(2);
+    db.close();
+    try (NoteStore s = new NoteStore(context)) {
+      assertEquals("Relay transcript", s.list("").get(0).text);
+      assertEquals(9L, s.list("").get(0).id);
+      assertEquals(0, s.evaluationCount());
+      assertFalse(s.pending().get(0).retain);
+      assertEquals("v2.wav", s.pending().get(0).file);
+      assertTrue(s.recoverDraft());
+      assertEquals(2, s.list("").size());
+    }
+    CloudJobs.recover(context);
+    assertTrue(audio.exists());
+  }
+
+  private void transcribePending(NoteStore.Pending pending, int status, String body)
+      throws Exception {
+    CountDownLatch completed = new CountDownLatch(1);
+    CloudJobs.submit(
+        context,
+        pending,
+        new CloudClient(url -> new Http(status, body)),
+        new CloudJobs.Result() {
+          public void complete(String text, long id) {
+            completed.countDown();
+          }
+
+          public void failed(String message) {
+            completed.countDown();
+          }
+        });
+    assertTrue(completed.await(10, TimeUnit.SECONDS));
+  }
+
+  public void testEvaluationRetryExportOriginalAndEditedTranscript() throws Exception {
+    groq();
+    File audio = wave("evaluation.wav");
+    byte[] original = java.nio.file.Files.readAllBytes(audio.toPath());
+    NoteStore.Pending pending =
+        new NoteStore.Pending(
+            "evaluation",
+            123456789L,
+            audio.getName(),
+            Prefs.GROQ_URL,
+            "whisper-large-v3",
+            "ko-KR",
+            1,
+            "ready",
+            true,
+            "groq");
+    try (NoteStore s = new NoteStore(context)) {
+      s.addPending(pending);
+    }
+    transcribePending(pending, 503, "unavailable");
+    try (NoteStore s = new NoteStore(context)) {
+      assertEquals(0, s.evaluationCount());
+      assertTrue(s.pending().get(0).retain);
+      assertEquals("failed", s.pending().get(0).state);
+    }
+    assertTrue(audio.exists());
+    CloudJobs.recover(context);
+    try (NoteStore s = new NoteStore(context)) {
+      pending = s.pending().get(0);
+    }
+    transcribePending(pending, 200, "{\"text\":\"원본 전사\"}");
+    long id;
+    try (NoteStore s = new NoteStore(context)) {
+      assertEquals(1, s.evaluationCount());
+      assertTrue(s.pending().isEmpty());
+      id = s.list("").get(0).id;
+      s.update(id, "수정한 전사");
+      assertEquals(-1L, s.completePending(pending, "Duplicate"));
+    }
+    CloudJobs.recover(context);
+    assertTrue(audio.exists());
+    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+    assertEquals(1, EvaluationArchive.write(context, bytes));
+    Map<String, byte[]> entries = new HashMap<>();
+    try (java.util.zip.ZipInputStream zip =
+        new java.util.zip.ZipInputStream(new ByteArrayInputStream(bytes.toByteArray()))) {
+      java.util.zip.ZipEntry entry;
+      while ((entry = zip.getNextEntry()) != null) entries.put(entry.getName(), zip.readAllBytes());
+    }
+    assertEquals(3, entries.size());
+    assertTrue(Arrays.equals(original, entries.get("audio/" + id + ".wav")));
+    org.json.JSONObject manifest =
+        new org.json.JSONObject(new String(entries.get("manifest.json"), StandardCharsets.UTF_8));
+    assertEquals(1, manifest.getInt("schema_version"));
+    org.json.JSONObject record =
+        new org.json.JSONObject(
+            new String(entries.get("recordings.jsonl"), StandardCharsets.UTF_8));
+    assertEquals("원본 전사", record.getString("original_transcript"));
+    assertEquals("수정한 전사", record.getString("transcript"));
+    assertEquals("groq", record.getString("provider"));
+    assertEquals("whisper-large-v3", record.getString("model"));
+    assertEquals("ko-KR", record.getString("language"));
+    assertEquals(123456789L, record.getLong("created_at_ms"));
+    assertFalse(record.has("endpoint"));
+    assertFalse(bytes.toString(StandardCharsets.ISO_8859_1.name()).contains("test-only-token"));
+    try (NoteStore s = new NoteStore(context)) {
+      s.delete(id);
+      assertEquals(0, s.evaluationCount());
+      assertTrue(s.list("").isEmpty());
+    }
+    assertFalse(audio.exists());
+  }
+
+  public void testFailedEvaluationExportKeepsAudio() throws Exception {
+    File audio = wave("export-failure.wav");
+    NoteStore.Pending p =
+        new NoteStore.Pending(
+            "export-failure",
+            1,
+            audio.getName(),
+            Prefs.GROQ_URL,
+            "model",
+            "en-US",
+            1,
+            "ready",
+            true,
+            "groq");
+    try (NoteStore s = new NoteStore(context)) {
+      s.addPending(p);
+      s.completePending(p, "Keep me");
+    }
+    try {
+      EvaluationArchive.write(
+          context,
+          new OutputStream() {
+            public void write(int b) throws IOException {
+              throw new IOException("Disk full");
+            }
+          });
+      throw new AssertionError("Expected export failure");
+    } catch (IOException expected) {
+    }
+    CloudJobs.recover(context);
+    assertTrue(audio.exists());
+    try (NoteStore s = new NoteStore(context)) {
+      assertEquals(1, s.evaluationCount());
+    }
+  }
+
+  public void testEvaluationChoiceIsCapturedAtRecordingStart() throws Exception {
+    groq();
+    assertFalse(Prefs.keepRecordings(context));
+    Prefs.get(context).edit().putBoolean("keep_recordings", true).commit();
+    Audio audio = new Audio();
+    HushTests.Capture listener = new HushTests.Capture();
+    CloudDictationEngine[] engine = new CloudDictationEngine[1];
+    main(
+        () -> {
+          engine[0] =
+              new CloudDictationEngine(
+                  context,
+                  listener,
+                  () -> audio,
+                  new CloudClient(url -> new Http(200, "{\"text\":\"Retained recording\"}")));
+          engine[0].start(false);
+        });
+    audio.waitForFrames();
+    Prefs.get(context).edit().putBoolean("keep_recordings", false).commit();
+    main(engine[0]::stop);
+    await(
+        () -> {
+          try (NoteStore s = new NoteStore(context)) {
+            return s.list("").size() == 1 && !CloudJobs.any();
+          }
+        });
+    main(engine[0]::close);
+    CloudJobs.recover(context);
+    try (NoteStore s = new NoteStore(context)) {
+      assertEquals(1, s.evaluationCount());
+      assertEquals(1, s.evaluationFiles().size());
+      assertTrue(
+          new File(CloudJobs.directory(context), s.evaluationFiles().iterator().next()).exists());
+    }
+    // New recordings after opt-out use the normal delete-after-commit behavior.
+    File next = wave("after-opt-out.wav");
+    NoteStore.Pending p =
+        new NoteStore.Pending(
+            "after-opt-out",
+            2,
+            next.getName(),
+            Prefs.GROQ_URL,
+            "model",
+            "en-US",
+            1,
+            "ready",
+            Prefs.keepRecordings(context),
+            "groq");
+    try (NoteStore s = new NoteStore(context)) {
+      s.addPending(p);
+    }
+    transcribePending(p, 200, "{\"text\":\"Not retained\"}");
+    assertFalse(next.exists());
+    try (NoteStore s = new NoteStore(context)) {
+      assertEquals(1, s.evaluationCount());
     }
   }
 
