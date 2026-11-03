@@ -1,6 +1,6 @@
 # Relay
 
-Native Android speech-to-text app with local transcript history and a default-assistant shortcut. Android 12+; tested on an Android 15 emulator. The original Hush assistant shortcut was confirmed working by the user on a Galaxy S23.
+Native Android speech-to-text app with local transcript history and a default-assistant shortcut. Android 12+; tested on an Android 15 emulator. The original Hush assistant shortcut was confirmed working by the user on a personal Android phone.
 
 ## Recording
 
@@ -91,7 +91,7 @@ GitHub Actions builds/lints the debug application and compiles its runtime tests
 
 ## Runtime verification
 
-See [VERIFICATION.md](VERIFICATION.md) and [TEST-RESULTS.txt](TEST-RESULTS.txt). **Runtime tests reset history and preferences: run only on a disposable emulator, never on the user's S23.**
+See [VERIFICATION.md](VERIFICATION.md) and [TEST-RESULTS.txt](TEST-RESULTS.txt). **Runtime tests reset history and preferences: run only on a disposable emulator, never on the user's personal phone.**
 
 Evaluation retention checks and synthetic UI screenshots are in
 [evaluation-data.md](docs/verification/evaluation-data.md). The project-local

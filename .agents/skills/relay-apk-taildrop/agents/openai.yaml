@@ -1,0 +1,3 @@
+interface:
+  display_name: "Relay APK Taildrop"
+  short_description: "Relay APK를 검증하고 Android 폰에 Taildrop으로 전송"

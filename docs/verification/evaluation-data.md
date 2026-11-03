@@ -1,7 +1,7 @@
 # Evaluation retention verification
 
 Verified on 2026-11-01 in the dedicated disposable Android 15/API 35 ARM64
-`relay-evaluation-disposable` emulator. No tests or installs ran on the user's S23.
+`relay-evaluation-disposable` emulator. No tests or installs ran on the user's personal phone.
 
 ## Checks
 

@@ -8,5 +8,6 @@
 - Cloud audio must stay recoverable on request failure and must be deleted after successful local transcript commit unless evaluation retention was explicitly enabled when capture started. Avoid logging audio, credentials, request headers, or provider responses containing secrets.
 - Maintain endpoint-scoped Android Keystore key encryption, HTTPS-only uploads, and redirect refusal.
 - Run `./gradlew assembleDebug assembleDebugAndroidTest lintDebug` for relevant changes. Release delivery uses `assembleRelease lintRelease` with the local signing files.
-- Runtime tests use the custom instrumentation runner `com.hush.voice.HushTestRunner`. **Run only on a disposable emulator: the tests reset app history and preferences.** Never run them on the user's S23.
+- Runtime tests use the custom instrumentation runner `com.hush.voice.HushTestRunner`. **Run only on a disposable emulator: the tests reset app history and preferences.** Never run them on the user's personal phone.
 - Always squash merge pull requests.
+- Never commit, push, or include in PRs/logs personal device names, hostnames, DNS/tailnet/node IDs, IP/MAC/serial addresses, signing certificate fingerprints, or user-specific absolute paths; keep actual values only in ignored local configuration and use generic placeholders in tracked files.
