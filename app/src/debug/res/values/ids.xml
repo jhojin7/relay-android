@@ -1,0 +1,4 @@
+<resources>
+    <item name="input_test_first" type="id" />
+    <item name="input_test_second" type="id" />
+</resources>

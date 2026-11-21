@@ -17,15 +17,22 @@ public final class HushTestRunner extends Instrumentation {
 
   @Override
   public void onStart() {
-    int passed = 0, failed = 0;
+    int passed = 0, failed = 0, skipped = 0;
     StringBuilder report = new StringBuilder();
     for (Class<?> type :
-        new Class<?>[] {HushTests.class, CloudTests.class, EvaluationUiTests.class})
+        new Class<?>[] {
+          HushTests.class, CloudTests.class, AssistantInputTests.class, EvaluationUiTests.class
+        })
       for (Method method : type.getDeclaredMethods()) {
         if (!method.getName().startsWith("test")) continue;
         if (selectedClass != null
             && !selectedClass.equals(type.getName())
             && !selectedClass.equals(type.getName() + "#" + method.getName())) continue;
+        if (type == AssistantInputTests.class && android.os.Build.VERSION.SDK_INT < 33) {
+          skipped++;
+          report.append("SKIP ").append(method.getName()).append(": requires Android 13+\n");
+          continue;
+        }
         Object test;
         try {
           java.lang.reflect.Constructor<?> ctor =
@@ -58,7 +65,7 @@ public final class HushTestRunner extends Instrumentation {
           }
         }
       }
-    if (passed == 0 && failed == 0) {
+    if (passed == 0 && failed == 0 && skipped == 0) {
       failed++;
       report.append("FAIL no matching tests\n");
     }
@@ -66,6 +73,7 @@ public final class HushTestRunner extends Instrumentation {
     results.putString("stream", "\n" + report + "\n" + passed + " passed, " + failed + " failed\n");
     results.putInt("passed", passed);
     results.putInt("failed", failed);
+    results.putInt("skipped", skipped);
     finish(failed == 0 ? Activity.RESULT_OK : Activity.RESULT_CANCELED, results);
   }
 }

@@ -9,6 +9,22 @@ import android.widget.*;
 final class RecordingPanel extends LinearLayout implements DictationEngine.Listener {
   private final DictationController engine;
   private Runnable observer;
+
+  interface Saved {
+    void complete(String text, boolean provisional);
+  }
+
+  private Saved onSaved;
+  private Runnable onCloseRequested;
+
+  void onSaved(Saved callback) {
+    onSaved = callback;
+  }
+
+  void onCloseRequested(Runnable callback) {
+    onCloseRequested = callback;
+  }
+
   private final TextView status, transcript, hint, time, done, again, discard;
   private final Ui.Wave wave;
   private final LinearLayout actions;
@@ -57,6 +73,7 @@ final class RecordingPanel extends LinearLayout implements DictationEngine.Liste
             "Close",
             false,
             () -> {
+              if (onCloseRequested != null) onCloseRequested.run();
               if (engineActive()) engine.stop();
               else dismiss.run();
             });
@@ -254,6 +271,7 @@ final class RecordingPanel extends LinearLayout implements DictationEngine.Liste
     discard.setEnabled(true);
     wave.setVisibility(GONE);
     notifyObserver();
+    if (!closed && onSaved != null) onSaved.complete(text, provisional);
   }
 
   @Override

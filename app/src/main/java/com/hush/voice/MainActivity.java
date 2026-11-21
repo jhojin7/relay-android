@@ -383,6 +383,16 @@ public final class MainActivity extends Activity {
         "Advanced features → Side button → Long press → Digital assistant.",
         "Open Android Settings",
         () -> openSettings(new Intent(Settings.ACTION_SETTINGS)));
+    step(
+        "04",
+        "Type into the current app",
+        "On Android 13 or later, enable Assistant dictation input in Relay Settings and enable"
+            + " Relay dictation input in Android Accessibility. Keep your existing keyboard."
+            + " In Samsung Keyboard settings → Voice input, turn off Use Side button for voice"
+            + " input if present, then check that the side button opens Relay with the keyboard"
+            + " visible. Names and behavior vary with One UI.",
+        "Open accessibility settings",
+        () -> openSettings(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)));
     body.addView(
         Ui.text(
             this,
@@ -493,6 +503,47 @@ public final class MainActivity extends Activity {
     assistant.addView(
         Ui.button(this, "Open Android assistant settings", false, this::chooseAssistant));
     body.addView(assistant);
+    Ui.gap(body, 20);
+    LinearLayout input = card();
+    input.addView(Ui.bold(this, "Assistant dictation input", 17, Ui.WHITE));
+    Switch insert = new Switch(this);
+    insert.setText("Insert into the current text field");
+    insert.setTextColor(Ui.WHITE);
+    insert.setMinHeight(Ui.dp(this, 48));
+    insert.setEnabled(android.os.Build.VERSION.SDK_INT >= 33);
+    insert.setChecked(Prefs.assistantInput(this));
+    insert.setOnCheckedChangeListener(
+        (b, v) -> {
+          Prefs.get(this).edit().putBoolean("assistant_input", v).apply();
+          if (!v && android.os.Build.VERSION.SDK_INT >= 33)
+            RelayAccessibilityService.cancelPending();
+        });
+    input.addView(insert);
+    String inputStatus =
+        android.os.Build.VERSION.SDK_INT < 33
+            ? "Automatic input requires Android 13 or later. Use Copy text on this device."
+            : RelayAccessibilityService.available()
+                ? "Accessibility service connected."
+                : "Enable Relay dictation input in Android Accessibility to connect.";
+    input.addView(Ui.text(this, inputStatus, 14, Ui.MUTED));
+    input.addView(
+        Ui.text(
+            this,
+            "When you invoke the assistant, Relay checks the focused text field and selection,"
+                + " then inserts your saved transcript. It reads that field only during dictation;"
+                + " it does not collect screenshots. Your keyboard stays selected. If you change"
+                + " the draft, cursor or app, Relay saves the transcript for copying instead."
+                + " Password fields are excluded. Messages are never sent automatically.",
+            13,
+            Ui.MUTED));
+    Ui.gap(input, 10);
+    input.addView(
+        Ui.button(
+            this,
+            "Open accessibility settings",
+            false,
+            () -> openSettings(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
+    body.addView(input);
     Ui.gap(body, 20);
     LinearLayout evaluation = card();
     evaluation.addView(Ui.bold(this, "Evaluation data", 17, Ui.WHITE));
