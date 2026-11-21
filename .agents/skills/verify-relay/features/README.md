@@ -3,6 +3,7 @@
 - [Capture and recovery](capture.md): home, recorder, assistant and pending audio.
 - [Transcript history](transcripts.md): search, edit, delete and TXT export.
 - [Evaluation data](evaluation.md): opt-in retention, immutable original, ZIP export.
+- [Assistant input](assistant-input.md): existing keyboard, cursor insertion and cancelled targets.
 
 Read the relevant feature before driving it. Doctor first, and retain evidence
 through cleanup. These features require a disposable emulator; runtime tests reset
