@@ -15,5 +15,9 @@
         </service>
         <service android:name=".HushSessionService" android:permission="android.permission.BIND_VOICE_INTERACTION" android:exported="true" />
         <service android:name=".HushRecognitionService" android:permission="android.permission.BIND_SPEECH_RECOGNITION_SERVICE" android:exported="true" />
+        <service android:name=".RelayAccessibilityService" android:label="Relay dictation input" android:enabled="@bool/assistant_input_supported" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="true">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service" />
+        </service>
     </application>
 </manifest>
