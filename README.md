@@ -17,6 +17,15 @@ the current text field**, then use **Open accessibility settings** to enable
 **Relay dictation input**. Keep your existing keyboard selected. This is optional;
 the microphone and default-assistant setup are still required.
 
+If an APK installation shows **Restricted setting**, **App access denied** or a
+disabled accessibility toggle, open **Settings → Apps → Relay → ⋮ → Allow
+restricted settings** if the menu is available. The app's **Open Relay app info**
+button opens the correct entry. Then return to **Accessibility → Installed apps →
+Relay dictation input** and enable the main service. The in-app switch does not
+grant this system permission; Relay cannot grant it automatically. Check for
+**Ready: accessibility service connected** after returning to Relay. See
+[Android's restricted-settings instructions](https://support.google.com/android/answer/12623953).
+
 Select a normal text field in another app, place the cursor (or select text to
 replace), and invoke Relay with your assistant shortcut. A pause or Done finishes
 recording. After the final transcript is saved locally, Relay closes the recorder
@@ -44,6 +53,11 @@ Menus and routing vary with One UI. This configuration does not replace Samsung'
 keyboard microphone or navigation-bar voice-input button. Samsung physical-button
 routing needs a manual check on the target firmware; emulator assistant-key tests
 do not establish it.
+
+If a long press instead displays Samsung's navigation-bar voice-input prompt,
+the shortcut is entering Samsung Keyboard's voice-input route, rather than proving
+Relay was invoked. Check the keyboard's side-button voice-input option separately
+from the accessibility setup above.
 
 ## Providers
 

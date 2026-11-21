@@ -774,4 +774,41 @@ public final class CloudTests {
     instrumentation.removeMonitor(monitor);
     main(a::finish);
   }
+
+  public void testRestrictedAccessibilitySetupOpensOwnAppInfo() {
+    if (android.os.Build.VERSION.SDK_INT < 33) return;
+    MainActivity activity =
+        (MainActivity)
+            instrumentation.startActivitySync(
+                new Intent(context, MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+    Instrumentation.ActivityMonitor monitor = null;
+    try {
+      main(
+          () ->
+              ((View) find(activity.getWindow().getDecorView(), "Settings").getParent())
+                  .performClick());
+      View[] button = {null};
+      main(() -> button[0] = find(activity.getWindow().getDecorView(), "Open Relay app info"));
+      assertNotNull(button[0]);
+      IntentFilter filter =
+          new IntentFilter(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+      filter.addDataScheme("package");
+      filter.addDataSchemeSpecificPart(
+          context.getPackageName(), android.os.PatternMatcher.PATTERN_LITERAL);
+      monitor =
+          instrumentation.addMonitor(
+              filter, new Instrumentation.ActivityResult(Activity.RESULT_OK, null), true);
+      main(
+          () ->
+              button[0].requestRectangleOnScreen(
+                  new android.graphics.Rect(0, 0, button[0].getWidth(), button[0].getHeight()),
+                  true));
+      instrumentation.waitForIdleSync();
+      main(() -> button[0].performClick());
+      assertEquals(1, monitor.getHits());
+    } finally {
+      if (monitor != null) instrumentation.removeMonitor(monitor);
+      main(activity::finish);
+    }
+  }
 }

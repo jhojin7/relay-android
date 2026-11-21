@@ -17,6 +17,11 @@ Required behavior:
 - Password input is rejected; disabling accessibility invalidates a pending request.
 - Dismissing the actual assistant window saves recovered speech without inserting
   a late result. A dispatched result is never automatically sent again.
+- The restricted-settings setup action opens Relay's own Android App info entry.
+  `CloudTests#testRestrictedAccessibilitySetupOpensOwnAppInfo` checks the Intent
+  action and exact package URI. Android 13+ APK installs can require a user to
+  allow restricted settings there before accessibility can be enabled. The in-app
+  opt-in alone is not permission and must not be presented as ready.
 
 `assistant-recording.png` and `assistant-inserted.png` are synthetic runtime evidence
 under app-private `files/verification/`; pull them using `control.py pull-evidence`.
@@ -30,3 +35,5 @@ Samsung side-button routing with its keyboard visible still requires an
 initialization-free manual check on the target One UI version. Do not run the
 instrumentation runner on a personal phone. The emulator's assistant key proves
 the assistant session/input path, not Samsung's hardware mapping.
+Shell-enabled accessibility in the input suite does not validate the APK installer
+or the restricted-settings consent flow on a physical Samsung device.

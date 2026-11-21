@@ -512,20 +512,16 @@ public final class MainActivity extends Activity {
     insert.setMinHeight(Ui.dp(this, 48));
     insert.setEnabled(android.os.Build.VERSION.SDK_INT >= 33);
     insert.setChecked(Prefs.assistantInput(this));
+    TextView inputStatus = Ui.text(this, assistantInputStatus(), 14, Ui.MUTED);
     insert.setOnCheckedChangeListener(
         (b, v) -> {
           Prefs.get(this).edit().putBoolean("assistant_input", v).apply();
           if (!v && android.os.Build.VERSION.SDK_INT >= 33)
             RelayAccessibilityService.cancelPending();
+          inputStatus.setText(assistantInputStatus());
         });
     input.addView(insert);
-    String inputStatus =
-        android.os.Build.VERSION.SDK_INT < 33
-            ? "Automatic input requires Android 13 or later. Use Copy text on this device."
-            : RelayAccessibilityService.available()
-                ? "Accessibility service connected."
-                : "Enable Relay dictation input in Android Accessibility to connect.";
-    input.addView(Ui.text(this, inputStatus, 14, Ui.MUTED));
+    input.addView(inputStatus);
     input.addView(
         Ui.text(
             this,
@@ -543,6 +539,38 @@ public final class MainActivity extends Activity {
             "Open accessibility settings",
             false,
             () -> openSettings(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      Ui.gap(input, 12);
+      input.addView(
+          Ui.text(
+              this,
+              "Android blocked accessibility access? For an APK install, open Relay app info,"
+                  + " tap the three-dot menu → Allow restricted settings if available. Then return"
+                  + " to Accessibility → Installed apps → Relay dictation input and turn on the"
+                  + " main service. The switch above alone does not grant access. Android requires"
+                  + " you to allow this yourself; Relay cannot enable it for you.",
+              13,
+              Ui.MUTED));
+      input.addView(
+          Ui.button(
+              this,
+              "Open Relay app info",
+              false,
+              () ->
+                  openSettings(
+                      new Intent(
+                          Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                          android.net.Uri.parse("package:" + getPackageName())))));
+      input.addView(
+          Ui.text(
+              this,
+              "If the side button still opens Samsung voice input, go to Samsung Keyboard settings"
+                  + " → Voice input and turn off Use Side button for voice input if present. Keep"
+                  + " Relay as the default assistant and the side-button long press set to Digital"
+                  + " assistant. Check this separately from accessibility access.",
+              13,
+              Ui.MUTED));
+    }
     body.addView(input);
     Ui.gap(body, 20);
     LinearLayout evaluation = card();
@@ -589,6 +617,16 @@ public final class MainActivity extends Activity {
     body.addView(storage);
     Ui.gap(body, 20);
     body.addView(Ui.text(this, "Relay 1.1.0", 12, Ui.MUTED));
+  }
+
+  private String assistantInputStatus() {
+    if (android.os.Build.VERSION.SDK_INT < 33)
+      return "Automatic input requires Android 13 or later. Use Copy text on this device.";
+    if (!Prefs.assistantInput(this)) return "Automatic input is off.";
+    return RelayAccessibilityService.available()
+        ? "Ready: accessibility service connected."
+        : "Not ready: accessibility is not connected. Enable Relay dictation input below."
+            + " If Android blocks it, follow the APK instructions.";
   }
 
   private void chooseProvider() {

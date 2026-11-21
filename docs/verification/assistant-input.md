@@ -37,7 +37,8 @@ python3 .agents/skills/verify-relay/scripts/control.py test
 python3 .agents/skills/verify-relay/scripts/control.py pull-evidence
 ```
 
-The full custom-runner suite passes **41 tests**, including six new input tests and
+The full custom-runner suite passes **42 tests**, including six input tests, the
+restricted-settings setup regression and
 the existing capture, HTTPS/credential handling, failure recovery, schema upgrade,
 recording retention and evaluation ZIP checks. The focused input suite also passes
 independently. Input tests are skipped on Android versions before API 33; normal
@@ -82,3 +83,32 @@ handoff; no cloud-job or database rewrite was needed. User dismissal releases th
 result listener and invalidates the target. Pending-recording retries have no
 target and never replay text into another app. Existing retention and recovery
 semantics remain unchanged.
+
+## APK installation follow-up
+
+Phone screenshots showed Android rejecting the accessibility grant under
+restricted settings, while the in-app opt-in was already enabled. The user also
+confirmed the Samsung navigation-bar voice-input prompt followed a side-button
+long press. These are separate gates: access to the insertion service and routing
+the assistant shortcut. The screenshots do not yet establish a failure of the
+input connection after a successful grant.
+
+The original suite enabled accessibility through shell settings, so it did not
+exercise the APK installation consent path. The UI now distinguishes an opt-in
+from a connected service, documents the Android App info restricted-settings menu,
+and opens Relay's exact App info entry. The new regression failed with the previous
+UI and passes with the setup action. All 42 runtime tests and debug build/lint pass.
+
+[Disconnected opt-in state](assistant-input-disconnected.png) and
+[restricted-settings recovery action](assistant-input-recovery.png) show the
+updated synthetic UI. The recovery button was also driven manually to Android
+App info for Relay on the disposable emulator.
+
+This improves recovery instructions; it does not bypass Android restrictions or
+prove that Samsung routes the hardware button to Relay. The phone still needs a
+user-granted accessibility service and a separate side-button configuration check.
+Keep the PR in draft while that actual-device report is unresolved.
+
+Sources: [Android restricted settings](https://support.google.com/android/answer/12623953),
+[Wispr setup](https://docs.wisprflow.ai/articles/8858845757),
+[Wispr sideload restriction note](https://docs.wisprflow.ai/articles/1522331174-using-wispr-flow-on-android-work-profiles).
