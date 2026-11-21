@@ -567,7 +567,8 @@ public final class MainActivity extends Activity {
               "If the side button still opens Samsung voice input, go to Samsung Keyboard settings"
                   + " → Voice input and turn off Use Side button for voice input if present. Keep"
                   + " Relay as the default assistant and the side-button long press set to Digital"
-                  + " assistant. Check this separately from accessibility access.",
+                  + " assistant. Hiding Keyboard button on navigation bar does not turn off this"
+                  + " side-button shortcut. Check this separately from accessibility access.",
               13,
               Ui.MUTED));
     }

@@ -59,6 +59,13 @@ the shortcut is entering Samsung Keyboard's voice-input route, rather than provi
 Relay was invoked. Check the keyboard's side-button voice-input option separately
 from the accessibility setup above.
 
+**Keyboard button on navigation bar** (내비게이션 바에 입력 방식 버튼 표시)
+is a different setting. Turning it off hides that button; it does not switch off
+**Samsung Keyboard settings → Voice input → Use Side button for voice input**
+(삼성 키보드 설정 → 음성 입력 → 측면 버튼으로 음성 입력). The latter path
+is documented by Samsung's Bixby voice team in its
+[One UI 8 support reply](https://r1.community.samsung.com/t5/%EA%B0%A4%EB%9F%AD%EC%8B%9C-s/one-ui-8-%EB%B9%85%EC%8A%A4%EB%B9%84-%EB%B0%9B%EC%95%84%EC%93%B0%EA%B8%B0/m-p/34997700).
+
 ## Providers
 
 ### Android on-device / system speech
