@@ -1,0 +1,4 @@
+<resources>
+    <bool name="assistant_input_supported">false</bool>
+    <string name="assistant_input_description">Inserts a saved transcript into the text field you were using when you invoked Relay. Checks that field and its selection to avoid typing into another app or replacing your draft. Only reads field contents during an explicit dictation; does not collect screenshots. Your existing keyboard stays selected.</string>
+</resources>

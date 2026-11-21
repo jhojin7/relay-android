@@ -10,6 +10,62 @@ Native Android speech-to-text app with local transcript history and a default-as
 - Recordings are limited to 3 minutes. Cloud pause detection uses microphone levels; background noise may require tapping Done.
 - Search, edit, copy, share, and export transcripts as TXT. Automatic clipboard copying is optional.
 
+## Dictate into the current app
+
+On Android 13 or later, enable **Settings → Assistant dictation input → Insert into
+the current text field**, then use **Open accessibility settings** to enable
+**Relay dictation input**. Keep your existing keyboard selected. This is optional;
+the microphone and default-assistant setup are still required.
+
+If an APK installation shows **Restricted setting**, **App access denied** or a
+disabled accessibility toggle, open **Settings → Apps → Relay → ⋮ → Allow
+restricted settings** if the menu is available. The app's **Open Relay app info**
+button opens the correct entry. Then return to **Accessibility → Installed apps →
+Relay dictation input** and enable the main service. The in-app switch does not
+grant this system permission; Relay cannot grant it automatically. Check for
+**Ready: accessibility service connected** after returning to Relay. See
+[Android's restricted-settings instructions](https://support.google.com/android/answer/12623953).
+
+Select a normal text field in another app, place the cursor (or select text to
+replace), and invoke Relay with your assistant shortcut. A pause or Done finishes
+recording. After the final transcript is saved locally, Relay closes the recorder
+and requests insertion into that same field. Partial or interrupted speech results
+are saved for review instead. Relay never sends the message or activates Send.
+
+If the field, draft, selection or foreground app changes, the screen locks, or
+accessibility access is lost, automatic insertion is cancelled. The saved note is
+still available in Relay for copying. Closing the recorder yourself also cancels
+insertion, including when a cloud transcription finishes later. Pending recordings
+retried from history are never automatically inserted into a former input field.
+
+Password and non-text fields are excluded. Custom editors that do not expose a
+usable Android input connection may require copying. Android 12/12L retains the
+existing recording and copy/paste flow. There is no automatic retry of a dispatched
+input request, since Android does not acknowledge whether it was applied.
+
+### Samsung side button with the keyboard open
+
+Select Relay as the default digital assistant and set **Advanced features → Side
+button → Long press → Digital assistant**. In **Samsung Keyboard settings → Voice
+input**, turn off **Use Side button for voice input** if that setting is present,
+then verify the side button opens Relay with the keyboard both hidden and visible.
+Menus and routing vary with One UI. This configuration does not replace Samsung's
+keyboard microphone or navigation-bar voice-input button. Samsung physical-button
+routing needs a manual check on the target firmware; emulator assistant-key tests
+do not establish it.
+
+If a long press instead displays Samsung's navigation-bar voice-input prompt,
+the shortcut is entering Samsung Keyboard's voice-input route, rather than proving
+Relay was invoked. Check the keyboard's side-button voice-input option separately
+from the accessibility setup above.
+
+**Keyboard button on navigation bar** (내비게이션 바에 입력 방식 버튼 표시)
+is a different setting. Turning it off hides that button; it does not switch off
+**Samsung Keyboard settings → Voice input → Use Side button for voice input**
+(삼성 키보드 설정 → 음성 입력 → 측면 버튼으로 음성 입력). The latter path
+is documented by Samsung's Bixby voice team in its
+[One UI 8 support reply](https://r1.community.samsung.com/t5/%EA%B0%A4%EB%9F%AD%EC%8B%9C-s/one-ui-8-%EB%B9%85%EC%8A%A4%EB%B9%84-%EB%B0%9B%EC%95%84%EC%93%B0%EA%B8%B0/m-p/34997700).
+
 ## Providers
 
 ### Android on-device / system speech
@@ -38,7 +94,7 @@ The language option **Auto** omits the language hint for cloud providers. Androi
 - Dismissing a recorder stops microphone capture. A cloud request may finish after its UI closes. If Android kills the process, recoverable audio appears for manual retry on the next launch.
 - Explicit Discard deletes in-progress cloud audio and prevents upload. Once uploading begins, Discard is disabled; Close may dismiss the UI while the request finishes.
 - Uninstalling deletes transcripts, pending audio, and keys. Export transcripts first if you need to keep them.
-- Relay does not request screen contents, screenshots, accessibility access, or automatic typing access. Copy/paste sends text to other apps.
+- Optional assistant input uses a user-enabled accessibility service. During an explicit assistant dictation it reads the target text field and selection to avoid overwriting a changed draft; the target snapshot is kept only in memory and is not sent to a provider, logged or exported. It does not request screenshots. Other recording paths continue to use copy/paste.
 
 ## Collecting your own evaluation data
 
