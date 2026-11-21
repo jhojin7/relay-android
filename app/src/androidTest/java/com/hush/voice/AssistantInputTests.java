@@ -95,7 +95,12 @@ public final class AssistantInputTests {
     captured[0] = null;
   }
 
-  void tearDown() {
+  void tearDown() throws Exception {
+    if (automation != null) {
+      // Also close a leftover recorder if a prior assertion failed while its window was open.
+      shell("input keyevent 4");
+      shell("input keyevent 4");
+    }
     main(
         () -> {
           if (captured[0] != null) captured[0].cancel();
@@ -277,8 +282,8 @@ public final class AssistantInputTests {
   }
 
   private void screenshot(String name) throws Exception {
-    settle();
-    SystemClock.sleep(300);
+    // Recording deliberately animates; waiting for UI idle can consume its silence timeout.
+    SystemClock.sleep(600);
     File directory = new File(context.getFilesDir(), "verification");
     directory.mkdirs();
     android.graphics.Bitmap bitmap = automation.takeScreenshot();
